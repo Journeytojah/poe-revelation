@@ -21,10 +21,6 @@
 	import { storePopup } from '@skeletonlabs/skeleton';
 	storePopup.set({ computePosition, autoUpdate, flip, shift, offset, arrow });
 
-
-  import { dev } from '$app/environment';
-
-
 </script>
 
 <slot />

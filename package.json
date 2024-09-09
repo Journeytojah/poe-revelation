@@ -46,7 +46,10 @@
   "dependencies": {
     "@floating-ui/dom": "1.6.10",
     "comlink": "^4.4.1",
+    "expiry-map": "^2.0.0",
     "highlight.js": "11.10.0",
-    "pathofexile-dat": "^9.1.0"
+    "idb": "^8.0.0",
+    "pathofexile-dat": "^9.1.0",
+    "pathofexile-dat-schema": "^4.0.0"
   }
 }
