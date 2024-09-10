@@ -1,4 +1,4 @@
-# Codename `poe2-dat-viewer`
+# Codename `poe-revelation`
 
 Attempt at porting SnosMe's [poe-dat-viewer](https://github.com/SnosMe/poe-dat-viewer) to SvelteKit, in order to improve the tooling around the wiki and prepare tooling for Path of Exile 2.
 
