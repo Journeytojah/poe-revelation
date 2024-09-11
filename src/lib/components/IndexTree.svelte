@@ -113,7 +113,7 @@
 	}
 </script>
 
-<section class="container overflow-y-scroll w-1/4">
+<section class=" overflow-y-scroll w-1/4">
 	<h3>Directory Contents</h3>
 	{#if currentPath}
 		<button on:click={goUp}>Go Up</button>
@@ -124,8 +124,8 @@
 		{/each}
 	</ul>
 
-	<div class="flex flex-col">
-		<div style="display: flex; gap: 1rem;">
+	<div class=" flex-col">
+		<div style="gap: 1rem;">
 			<!-- Directory Contents and Files -->
 			<div style="flex: 3;">
 				<h4>Files</h4>
@@ -139,7 +139,7 @@
 	</div>
 </section>
 
-<section class="container w-3/4 max-h-screen overflow-scroll">
+<section class=" w-3/4 max-h-screen overflow-scroll">
 	<!-- Display the data rows -->
 	{#if rows.length > 0}
 		<h3>Data Rows</h3>
