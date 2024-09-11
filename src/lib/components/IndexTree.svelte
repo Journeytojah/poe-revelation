@@ -116,11 +116,16 @@
 <section class=" overflow-y-scroll w-1/4">
 	<h3>Directory Contents</h3>
 	{#if currentPath}
-		<button on:click={goUp}>Go Up</button>
+		<button type="button" class="btn variant-outline-primary w-full" on:click={goUp}>Go Up</button>
 	{/if}
 	<ul>
 		{#each dirContents.dirs as dir}
-			<li on:click={() => loadDirContents(dir)}><strong>{dir}</strong></li>
+			<!-- <li on:click={() => loadDirContents(dir)}><strong>{dir}</strong></li> -->
+       <li>
+         <button type="button" class="btn variant-ghost-primary w-full truncate" on:click={() => loadDirContents(dir)}>
+           {dir}
+          </button>
+        </li>
 		{/each}
 	</ul>
 
@@ -131,7 +136,14 @@
 				<h4>Files</h4>
 				<ul>
 					{#each dirContents.files as file}
-						<li on:click={() => loadFileContent(`${file}`)}>{file}</li>
+						<!-- <li on:click={() => loadFileContent(`${file}`)}>{file}</li> -->
+            <li>
+              <button type="button" class="btn variant-ghost-primary w-full" on:click={() => loadFileContent(`${file}`)}>
+                <p class="truncate">
+                  {file.split('/').pop()}
+                </p>
+              </button>
+            </li>
 					{/each}
 				</ul>
 			</div>
