@@ -57,7 +57,8 @@ export class DatSchemasDatabase {
 
   async fetchSchema() {
     this._isLoading.set(true);
-    const response = await fetch('https://poe-bundles.snos.workers.dev/schema.min.json');
+    // const response = await fetch('https://poe-bundles.snos.workers.dev/schema.min.json');
+    const response = await fetch('/schema.min.json');
     const schema: SchemaFile = await response.json();
 
     console.log('Schema loaded:', schema);

@@ -100,7 +100,8 @@ export class BundleLoader {
       }));
 
       // Network fetch request
-      res = await fetch(`https://poe-bundles.snos.workers.dev/${path}`);
+      // res = await fetch(`https://poe-bundles.snos.workers.dev/${path}`);
+      res = await fetch('/_.index.bin')
       if (res.status !== 200) {
         this.state.update((state) => ({ ...state, isDownloading: false }));
         throw new Error(`patchcdn: ${res.status} ${res.statusText}`);

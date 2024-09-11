@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { Header } from '$lib/dat-viewer/headers';
   import type { BundleIndex } from '$lib/patchcdn/index-store';
-  import { onMount } from 'svelte';
+  	import type { DatFile } from 'pathofexile-dat/dat.js';
+import { onMount } from 'svelte';
 
   let loader;
   let index: BundleIndex;
@@ -83,14 +84,14 @@
   }
 
   // Function to extract rows from datFile based on the headers
-  async function extractRows(datFile, headers) {
+  async function extractRows(datFile: DatFile, headers: Header[]) {
 
     // Dynamically import necessary functions
     const { readColumn } = await import('pathofexile-dat/dat.js');
 
     const rows = [];
     for (let i = 0; i < datFile.rowCount; i++) {
-      const row = {};
+      const row: { [key: string]: any } = {};
       for (const header of headers) {
         const value = await readColumn(header, datFile)[i];
         row[header.name || `Unnamed ${i}`] = value;
