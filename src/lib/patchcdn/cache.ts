@@ -1,7 +1,7 @@
 import { writable, get, derived } from 'svelte/store';
-import ExpiryMap from 'expiry-map/dist';
+import ExpiryMap from 'expiry-map/dist';  // For caching the bundles
 
-const BUNDLE_DIR = 'Bundles2';
+const BUNDLE_DIR = 'Bundles2';  // Directory for bundles
 
 export class BundleLoader {
   private patchVer = '';
@@ -15,13 +15,15 @@ export class BundleLoader {
     active: null as Promise<unknown> | null
   });
 
-  private readonly registry = new FinalizationRegistry<string>(name => {
+  // For tracking memory usage and garbage collection
+  private readonly registry = new FinalizationRegistry<string>((name) => {
     console.debug(`[Bundle] garbage-collected, name: "${name}"`);
   });
 
+  // Caching bundles in memory for a limited time
   private readonly weakCache = new ExpiryMap<string, ArrayBuffer>(20 * 1000);
 
-  // Patch version setter and cache management
+  // Set the patch version and clear old cache if necessary
   async setPatch(version: string) {
     const stateVal = get(this.state);
     if (stateVal.active) {
@@ -29,92 +31,93 @@ export class BundleLoader {
     }
     if (this.patchVer && this.patchVer !== version) {
       this.weakCache.clear();
-      await caches.delete('bundles');
+      await caches.delete('bundles');  // Clear cache if patch version changes
     }
     this.patchVer = version;
   }
 
-  // Derived store to replace Vue's computed
-  readonly progress = derived(this.state, $state => {
+  // Derived store for download progress
+  readonly progress = derived(this.state, ($state) => {
     return $state.isDownloading
       ? {
         totalSize: $state.totalSize,
         received: $state.received,
-        bundleName: $state.bundleName
+        bundleName: $state.bundleName,
       }
       : null;
   });
 
-  // Fetch file method with memory caching and network/disk fallback
+  // Fetch file from memory, disk cache, or network
   async fetchFile(name: string): Promise<ArrayBuffer> {
+    // First, try to fetch from memory cache
     let bundle = this.weakCache.get(name);
     if (bundle && bundle.byteLength !== 0) {
       console.log(`[Bundle] name: "${name}", source: memory.`);
-      this.weakCache.set(name, bundle); // refresh TTL
+      this.weakCache.set(name, bundle);  // Refresh TTL
       return bundle;
     }
 
     const stateVal = get(this.state);
     if (stateVal.active) {
-      await stateVal.active;
-      return await this.fetchFile(name); // Retry after active promise
+      await stateVal.active;  // Wait for any active file being fetched
+      return await this.fetchFile(name);  // Retry after active promise resolves
     }
 
     const promise = this._fetchFile(name);
-    this.state.update(state => ({ ...state, active: promise }));
+    this.state.update((state) => ({ ...state, active: promise }));
 
     try {
-      bundle = await promise;
-      this.registry.register(bundle, name);
-      this.weakCache.set(name, bundle);
+      bundle = await promise;  // Wait for file to be fetched
+      this.registry.register(bundle, name);  // Register for garbage collection
+      this.weakCache.set(name, bundle);  // Store in memory cache
       return bundle;
     } catch (e) {
       alert('You may need to adjust the patch version.');
       throw e;
     } finally {
-      this.state.update(state => ({ ...state, active: null }));
+      this.state.update((state) => ({ ...state, active: null }));
     }
   }
 
-  // Private method to handle the actual fetching and caching
+  // Private method to actually handle the fetching
   private async _fetchFile(name: string): Promise<ArrayBuffer> {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const stateVal = get(this.state);
     const path = `${this.patchVer}/${BUNDLE_DIR}/${name}`;
     const cache = await caches.open('bundles');
     let res = await cache.match(path);
 
     if (res) {
+      // File found in disk cache
       console.log(`[Bundle] name: "${name}", source: disk cache.`);
     } else {
+      // File needs to be fetched from network
       console.log(`[Bundle] name: "${name}", source: network.`);
-
-      this.state.update(state => ({
+      this.state.update((state) => ({
         ...state,
         totalSize: 0,
         received: 0,
         isDownloading: true,
-        bundleName: name
+        bundleName: name,
       }));
 
-      // res = await fetch(`https://poe-bundles.snos.workers.dev/${path}`);
-      res = await fetch(`./_.index.bin`);
+      // Network fetch request
+      res = await fetch(`https://poe-bundles.snos.workers.dev/${path}`);
       if (res.status !== 200) {
-        this.state.update(state => ({ ...state, isDownloading: false }));
+        this.state.update((state) => ({ ...state, isDownloading: false }));
         throw new Error(`patchcdn: ${res.status} ${res.statusText}`);
       }
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const totalSize = Number(res.headers.get('content-length'));
 
+      // const totalSize = Number(res.headers.get('content-length'));
       const reader = res.body!.getReader();
       const chunks: Uint8Array[] = [];
       let received = 0;
+
+      // Read the response in chunks
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         chunks.push(value);
         received += value.length;
-        this.state.update(state => ({ ...state, received }));
+        this.state.update((state) => ({ ...state, received }));
       }
 
       const buf = new Uint8Array(received);
@@ -124,17 +127,20 @@ export class BundleLoader {
         bufPos += chunk.length;
       }
 
-      this.state.update(state => ({ ...state, isDownloading: false }));
-
+      // Save response to disk cache
       await cache.put(path, new Response(buf, {
         headers: {
           'content-length': String(buf.byteLength),
-          'content-type': 'application/octet-stream'
-        }
+          'content-type': 'application/octet-stream',
+        },
       }));
+
+      // Update state to mark download complete
+      this.state.update((state) => ({ ...state, isDownloading: false }));
+
       return buf.buffer;
     }
 
-    return await res.arrayBuffer();
+    return await res.arrayBuffer();  // Return ArrayBuffer of the file
   }
 }

@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { Header } from '$lib/dat-viewer/headers';
-	import type { BundleIndex } from '$lib/patchcdn/index-store';
+  import type { Header } from '$lib/dat-viewer/headers';
+  import type { BundleIndex } from '$lib/patchcdn/index-store';
   import { onMount } from 'svelte';
-  
+
   let loader;
   let index: BundleIndex;
   let db: any;
@@ -11,173 +11,196 @@
   let fileContent: Uint8Array | null = null;
   let headers: Header[] = []; // Store headers here
   let currentPath: string = '';
-  let schemaName: string;
-  
-  // Ensure this runs only in the browser, with dynamic import
+  let rows: any[] = []; // To store rows from the .dat file
+
   onMount(async () => {
-    if (typeof window !== 'undefined') {
-      console.log('Loading patch');
-      
-      // Dynamically import the necessary modules to avoid SSR issues
-      const { readDatFile, analyzeDatFile } = await import('pathofexile-dat/dat.js');
-      const { BundleLoader } = await import('$lib/patchcdn/cache');
-      const { BundleIndex } = await import('$lib/patchcdn/index-store');
-      const { DatSchemasDatabase } = await import('$lib/dat-viewer/db');
-      const { fromSerializedHeaders } = await import('$lib/dat-viewer/headers');
+    const { BundleLoader } = await import('$lib/patchcdn/cache');
+    const { BundleIndex } = await import('$lib/patchcdn/index-store');
+    const { DatSchemasDatabase } = await import('$lib/dat-viewer/db');
+    const { fromSerializedHeaders } = await import('$lib/dat-viewer/headers');
 
-      loader = new BundleLoader();
-      await loader.setPatch('3.25.1.1.3');
+    loader = new BundleLoader();
+    await loader.setPatch('3.25.1.1.3');  // Set the patch version
 
-      index = new BundleIndex(loader);
-      await index.loadIndex();
+    index = new BundleIndex(loader);
+    await index.loadIndex();  // Load index
 
-      db = new DatSchemasDatabase(index);
-      await db.fetchSchema();
+    db = new DatSchemasDatabase(index);
+    await db.fetchSchema();  // Fetch schemas
 
-      // Load root directories initially
-      currentPath = ''; // Root path
-      dirs = index.getRootDirs() || [];
-      await loadDirContents(currentPath);  // Initialize root directory
-    }
+    // Load root directories
+    currentPath = '';
+    dirs = index.getRootDirs() || [];
+    await loadDirContents(currentPath);  // Initialize root directory
   });
 
+  // Load directory contents
   async function loadDirContents(dirPath: string) {
-    if (typeof window !== 'undefined') {
-      currentPath = dirPath;  // Update current path
+    currentPath = dirPath;  // Update current path
 
-      // Get the directory contents (already separated into dirs and files)
-      const contents = index.getDirContent(dirPath) || { files: [], dirs: [] };
-      console.log('Loaded dir contents:', contents);
+    const contents = index.getDirContent(dirPath) || { files: [], dirs: [] };
+    dirContents = { dirs: contents.dirs, files: contents.files };
+  }
 
-      // Update dirContents with the structure returned from getDirContent
-      dirContents = {
-        dirs: contents.dirs,  // Directories
-        files: contents.files  // Files
-      };
+  // Load file content
+  async function loadFileContent(filePath: string) {
+    fileContent = await index.loadFileContent(filePath);  // Load file content
+
+    // Extract schema name
+    const schemaName = filePath.replace('data/', '').replace('.dat64', '');
+
+    // Dynamically import necessary functions
+    const { readDatFile, readColumn } = await import('pathofexile-dat/dat.js');
+    const { analyzeDatFile } = await import('$lib/worker/interface');
+    const { fromSerializedHeaders } = await import('$lib/dat-viewer/headers');
+
+    // Parse `.dat64` file
+    const datFile = readDatFile(filePath, fileContent);
+    const columnStats = await analyzeDatFile(datFile);
+
+    // Find and apply headers
+    const serializedHeaders = await db.findByName(schemaName);
+    const headersResult = fromSerializedHeaders(serializedHeaders, columnStats, datFile);
+
+    if (headersResult) {
+      headers = headersResult.headers;
+      console.log('Loaded file headers:', headers);
+
+      // Time the operation of extracting rows
+      const startTime = performance.now();
+
+      // Extract rows from the datFile using the headers
+      rows = await extractRows(datFile, headers);
+      console.log('Extracted rows:', rows);
+
+      const endTime = performance.now();
+      console.log(`Extracting rows took ${endTime - startTime} milliseconds`);
+
+
+    } else {
+      console.warn(`Invalid headers for file: ${schemaName}`);
     }
   }
 
- async function loadFileContent(filePath: string) {
-  // Load the file content
-  fileContent = await index.loadFileContent(filePath);
+  // Function to extract rows from datFile based on the headers
+  async function extractRows(datFile, headers) {
 
-  // Extract the schema name from the file path
-  const schemaName = filePath.replace('data/', '').replace('.dat64', '');
+    // Dynamically import necessary functions
+    const { readColumn } = await import('pathofexile-dat/dat.js');
 
-  // Dynamically import `readDatFile` and `analyzeDatFile`
-  const { readDatFile } = await import('pathofexile-dat/dat.js');
-  const { analyzeDatFile } = await import('$lib/worker/interface');  // Adjust import path
-  const { fromSerializedHeaders } = await import('$lib/dat-viewer/headers');
-
-  // Parse the `.dat64` file using `readDatFile`
-  const datFile = readDatFile(filePath, fileContent);
-
-  // Analyze the `.dat64` file to get column statistics
-  const columnStats = await analyzeDatFile(datFile);
-
-  // Find the serialized headers from the schema database
-  const serializedHeaders = await db.findByName(schemaName);
-
-  // Deserialize the headers
-  const headersResult = fromSerializedHeaders(serializedHeaders, columnStats, datFile);
-  
-  // Check if the headers are valid and update the headers variable
-  if (headersResult) {
-    headers = headersResult.headers;
-    console.log('Loaded file headers:', headers);
-  } else {
-    console.warn(`Invalid headers for file: ${schemaName}`);
+    const rows = [];
+    for (let i = 0; i < datFile.rowCount; i++) {
+      const row = {};
+      for (const header of headers) {
+        const value = await readColumn(header, datFile)[i];
+        row[header.name || `Unnamed ${i}`] = value;
+      }
+      rows.push(row);
+    }
+    return rows;
   }
-}
 
-
+  // Navigate up one directory level
   function goUp() {
     if (currentPath) {
       const parts = currentPath.split('/');
-      parts.pop(); // Remove the last part
-      const parentDir = parts.join('/');
-      loadDirContents(parentDir);
+      parts.pop();
+      loadDirContents(parts.join('/'));
     }
   }
 </script>
 
+<section>
+  <div style="display: flex; gap: 1rem;">
+    <!-- Directory Listing -->
+    <div style="flex: 1;">
+      <h3>Directories</h3>
+      {#if currentPath}
+        <button on:click={goUp}>Go Up</button>
+      {/if}
+      <ul>
+        {#each dirs as dir}
+          <li on:click={() => loadDirContents(dir)}><strong>{dir}</strong></li>
+        {/each}
+      </ul>
+    </div>
 
-<section class="container">
-<h3>Directories</h3>
-{#if currentPath}
-  <button on:click={goUp}>Go Up</button>
-{/if}
-<ul>
-  {#each dirs as dir}
-    <li on:click={() => loadDirContents(dir)}><strong>{dir}</strong></li>
-  {/each}
-</ul>
-</section>
+    <!-- Directory Contents and Files -->
+    <div style="flex: 3;">
+      <h3>Directory Contents</h3>
+      <h4>Subdirectories</h4>
+      <ul>
+        {#each dirContents.dirs as dir}
+          <li on:click={() => loadDirContents(`${currentPath}/${dir}`)}><strong>{dir}</strong></li>
+        {/each}
+      </ul>
 
-<section class="container">
+      <h4>Files</h4>
+      <ul>
+        {#each dirContents.files as file}
+          <li on:click={() => loadFileContent(`${file}`)}>{file}</li>
+        {/each}
+      </ul>
 
-<h3>Directory Contents</h3>
-<!-- Separate Directories and Files -->
-<h4>Subdirectories</h4>
-<ul>
-  {#each dirContents.dirs as dir}
-    <li on:click={() => loadDirContents(`${currentPath}/${dir}`)}><strong>{dir}</strong></li>
-  {/each}
-</ul>
-</section>
+      <!-- Display the headers in a table -->
+      {#if headers.length > 0}
+        <h3>File Headers</h3>
+        <table border="1" style="width: 100%;">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Offset</th>
+              <th>Length</th>
+              <th>Type</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each headers as header}
+              <tr>
+                <td>{header.name ? header.name : 'Unnamed'}</td>
+                <td>{header.offset}</td>
+                <td>{header.length}</td>
+                <td>
+                  {#if header.type.integer}
+                    Integer (Size: {header.type.integer.size}, Unsigned: {header.type.integer.unsigned})
+                  {:else if header.type.string}
+                    String
+                  {:else if header.type.decimal}
+                    Decimal (Size: {header.type.decimal.size})
+                  {:else if header.type.boolean}
+                    Boolean
+                  {:else if header.type.key}
+                    Key (Foreign: {header.type.key.foreign}, Table: {header.type.key.table || 'None'})
+                  {/if}
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {/if}
 
-<section class="container">
-<h4>Files</h4>
-<ul>
-  {#each dirContents.files as file}
-    <li on:click={() => loadFileContent(`${currentPath}/${file}`)}>{file}</li>
-  {/each}
-</ul>
-
-{#if fileContent}
-  <h3>File Content</h3>
-  <pre>{fileContent}</pre>
-{/if}
-</section>
-
-<section class="container">
-  <h3>File Headers</h3>
-{#if headers.length > 0}
-  <table>
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Offset</th>
-        <th>Length</th>
-        <th>Type</th>
-      </tr>
-    </thead>
-    <tbody>
-      {#each headers as header}
-        <tr>
-          <td>{header.name ? header.name : 'Unnamed'}</td>
-          <td>{header.offset}</td>
-          <td>{header.length}</td>
-          <td>
-            {#if header.type.integer}
-              Integer (Size: {header.type.integer.size}, Unsigned: {header.type.integer.unsigned})
-            {:else if header.type.string}
-              String
-            {:else if header.type.decimal}
-              Decimal (Size: {header.type.decimal.size})
-            {:else if header.type.boolean}
-              Boolean
-            {:else if header.type.key}
-              Key (Foreign: {header.type.key.foreign}, Table: {header.type.key.table || 'None'})
-            {:else if header.type.byteView}
-              ByteView (Array: {header.type.byteView.array})
-            {/if}
-          </td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
-{:else}
-  <p>No headers available for this file.</p>
-{/if}
+      <!-- Display the data rows -->
+      {#if rows.length > 0}
+        <h3>Data Rows</h3>
+        <table border="1" style="width: 100%;">
+          <thead>
+            <tr>
+              {#each headers as header}
+                <th>{header.name ? header.name : 'Unnamed'}</th>
+              {/each}
+            </tr>
+          </thead>
+          <tbody>
+            {#each rows as row}
+              <tr>
+                {#each Object.keys(row) as key}
+                  <td>{row[key]}</td>
+                {/each}
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {/if}
+    </div>
+  </div>
 </section>

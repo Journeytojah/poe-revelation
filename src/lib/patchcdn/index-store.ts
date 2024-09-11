@@ -27,55 +27,28 @@ export class BundleIndex {
     const _index = readIndexBundle(indexBundle);
     const { slice: pathReps } = await decompressBundle(_index.pathRepsBundle.slice().buffer);
 
-    console.log('Index loaded:', _index);  // Inspect the index structure here
-    console.log('Files Info:', _index.filesInfo);  // Ensure the filesInfo is populated correctly
+    console.log('Index loaded:', _index);  // Log the entire index structure
 
     this.index.set({
       bundlesInfo: _index.bundlesInfo,
       filesInfo: _index.filesInfo,
       dirsInfo: _index.dirsInfo,
-      pathReps
+      pathReps,
     });
+
+    // Log filesInfo to check if .dat64 files are indexed
+    console.log('Files Info:', _index.filesInfo);
   }
 
+  // Load file content based on filePath
   async loadFileContent(fullPath: string) {
-    const index = get(this.index);
-    if (!index) {
-      throw new Error('Index is not loaded.');
-    }
+    const { bundlesInfo, filesInfo } = get(this.index)!;
+    
+    const location = getFileInfo(fullPath, bundlesInfo, filesInfo)
+    const bundleBin = await this.loader.fetchFile(location.bundle)
 
-    const { bundlesInfo, filesInfo } = index;
-
-    console.log('Trying to load file:', fullPath);
-    console.log('Files info:', filesInfo);
-
-    // Log the hash that `getFileInfo` will search for
-    const murmur64a = (await import('$lib/utils/murmur2.js')).murmur64a;
-    const fileHash = murmur64a(fullPath.toLowerCase());
-    console.log('File hash:', fileHash);
-
-    try {
-      // log with color to easily identify the file location
-      console.log('%cGetting file location...', 'color: #2196F3');
-      console.log('Full path:', fullPath);
-      console.log('Bundles info:', bundlesInfo);
-      console.log('Files info:', filesInfo);
-      
-      
-      const location = getFileInfo(fullPath, bundlesInfo, filesInfo);
-      console.log('File location:', location);
-
-      if (!location) {
-        throw new Error(`File not found for path: ${fullPath}`);
-      }
-
-      const bundleBin = await this.loader.fetchFile(location.bundle);
-      const { slice } = await decompressFileInBundle(bundleBin.slice(0), location.offset, location.size);
-      return slice;
-    } catch (error) {
-      console.error(`Failed to load file: ${fullPath}`, error);
-      throw error;
-    }
+    const { slice } = await decompressFileInBundle(bundleBin.slice(0), location.offset, location.size)
+    return slice
   }
 
   // Get directory content for a given path
@@ -100,7 +73,7 @@ export class BundleIndex {
     return await getBatchFileInfo(paths, bundlesInfo, filesInfo);
   }
 
-  // Reactively watch index updates (similar to Vue's watch)
+  // Reactively watch index updates
   watch(cb: () => void) {
     this.index.subscribe(cb); // Use the store's subscription mechanism
   }

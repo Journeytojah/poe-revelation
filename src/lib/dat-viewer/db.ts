@@ -59,6 +59,9 @@ export class DatSchemasDatabase {
     this._isLoading.set(true);
     const response = await fetch('https://poe-bundles.snos.workers.dev/schema.min.json');
     const schema: SchemaFile = await response.json();
+
+    console.log('Schema loaded:', schema);
+    
     if (schema.version === SCHEMA_VERSION) {
       this.publicSchema.set(schema.tables);
     } else {
