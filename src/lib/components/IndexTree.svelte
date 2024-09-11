@@ -109,7 +109,7 @@
 	}
 </script>
 
-<section class="container h-screen overflow-y-scroll w-1/4">
+<section class="container overflow-y-scroll w-1/4">
 	<h3>Directory Contents</h3>
 	{#if currentPath}
 		<button on:click={goUp}>Go Up</button>
@@ -135,7 +135,7 @@
 	</div>
 </section>
 
-<section class="container w-3/4 h-screen">
+<section class="container w-3/4 max-h-screen overflow-scroll">
 	<!-- Display the headers in a table -->
 	<!-- {#if headers.length > 0}
 		<h3>File Headers</h3>
@@ -176,7 +176,7 @@
 	<!-- Display the data rows -->
 	{#if rows.length > 0}
 		<h3>Data Rows</h3>
-    <div class="table-container h-screen">
+    <div class="table-auto">
 
 		<table class="table table-hover">
 			<thead>
