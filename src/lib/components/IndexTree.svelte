@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { Header } from '$lib/dat-viewer/headers';
 	import type { BundleIndex } from '$lib/patchcdn/index-store';
-	import { TreeView, TreeViewItem } from '@skeletonlabs/skeleton';
 	import type { DatFile } from 'pathofexile-dat/dat.js';
 	import { onMount } from 'svelte';
 
@@ -19,7 +18,6 @@
 		const { BundleLoader } = await import('$lib/patchcdn/cache');
 		const { BundleIndex } = await import('$lib/patchcdn/index-store');
 		const { DatSchemasDatabase } = await import('$lib/dat-viewer/db');
-		const { fromSerializedHeaders } = await import('$lib/dat-viewer/headers');
 
 		loader = new BundleLoader();
 		await loader.setPatch('3.25.1.1.3'); // Set the patch version
@@ -65,7 +63,11 @@
 		const headersResult = fromSerializedHeaders(serializedHeaders, columnStats, datFile);
 
 		if (headersResult) {
-			headers = headersResult.headers;
+			// Assign default names to unnamed headers
+			headers = headersResult.headers.map((header, index) => ({
+				...header,
+				name: header.name ? header.name : `Unnamed ${index}`
+			}));
 			console.log('Loaded file headers:', headers);
 
 			// Time the operation of extracting rows
@@ -92,7 +94,9 @@
 			const row: { [key: string]: any } = {};
 			for (const header of headers) {
 				const value = await readColumn(header, datFile)[i];
-				row[header.name || `Unnamed ${i}`] = value;
+				if (header.name) {
+					row[header.name] = value;
+				}
 			}
 			rows.push(row);
 		}
@@ -136,67 +140,43 @@
 </section>
 
 <section class="container w-3/4 max-h-screen overflow-scroll">
-	<!-- Display the headers in a table -->
-	<!-- {#if headers.length > 0}
-		<h3>File Headers</h3>
-		<table border="1" style="width: 100%;">
-			<thead>
-				<tr>
-					<th>Name</th>
-					<th>Offset</th>
-					<th>Length</th>
-					<th>Type</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each headers as header}
-					<tr>
-						<td>{header.name ? header.name : 'Unnamed'}</td>
-						<td>{header.offset}</td>
-						<td>{header.length}</td>
-						<td>
-							{#if header.type.integer}
-								Integer (Size: {header.type.integer.size}, Unsigned: {header.type.integer.unsigned})
-							{:else if header.type.string}
-								String
-							{:else if header.type.decimal}
-								Decimal (Size: {header.type.decimal.size})
-							{:else if header.type.boolean}
-								Boolean
-							{:else if header.type.key}
-								Key (Foreign: {header.type.key.foreign}, Table: {header.type.key.table || 'None'})
-							{/if}
-						</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-	{/if} -->
-
 	<!-- Display the data rows -->
 	{#if rows.length > 0}
 		<h3>Data Rows</h3>
-    <div class="table-auto">
 
-		<table class="table table-hover">
-			<thead>
-				<tr>
-					{#each headers as header}
-						<th>{header.name ? header.name : 'Unnamed'}</th>
-					{/each}
-				</tr>
-			</thead>
-			<tbody>
-				{#each rows as row}
+		<div class="table-auto">
+			<table class="table table-hover">
+				<thead>
 					<tr>
-						{#each Object.keys(row) as key}
-							<td>{row[key]}</td>
+						<th>#</th>
+						<!-- Index column -->
+						{#each headers as header}
+							<th class="text-center">
+								<p>{header.name}</p>
+								<p>Length: {header.length}</p>
+							</th>
+							<!-- Use the header name, including Unnamed X -->
 						{/each}
 					</tr>
-				{/each}
-			</tbody>
-		</table>
-    </div>
-
+				</thead>
+				<tbody>
+					{#each rows as row, i}
+						<tr>
+							<td>{i + 1}</td>
+							{#each headers as header}
+								<!-- TODO: Keep an eye of the comparison with falsy values, it might replace data. -->
+								<td
+									>{header.name
+										? row[header.name] === ''
+											? 'empty'
+											: row[header.name]
+										: 'Unnamed'}</td
+								>
+							{/each}
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
 	{/if}
 </section>
