@@ -48,6 +48,9 @@ export class BundleIndex {
     const bundleBin = await this.loader.fetchFile(location.bundle)
 
     const { slice } = await decompressFileInBundle(bundleBin.slice(0), location.offset, location.size)
+
+    console.log('File content:', slice); // Log the file content
+    
     return slice
   }
 

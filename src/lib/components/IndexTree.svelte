@@ -3,6 +3,7 @@
 	import type { BundleIndex } from '$lib/patchcdn/index-store';
 	import type { DatFile } from 'pathofexile-dat/dat.js';
 	import { onMount } from 'svelte';
+	import TableCell from './TableCell.svelte';
 
 	let loader;
 	let index: BundleIndex;
@@ -13,6 +14,18 @@
 	let headers: Header[] = []; // Store headers here
 	let currentPath: string = '';
 	let rows: any[] = []; // To store rows from the .dat file
+	let searchTerm: string = '';
+
+	let showBytesByColumn: boolean[] = []; // Track column toggle states
+
+	function toggleColumn(index: number) {
+		showBytesByColumn[index] = !showBytesByColumn[index];
+	}
+
+	$: filteredFiles = dirContents.files.filter((file) => {
+		if (!searchTerm) return true;
+		return file.includes(searchTerm);
+	});
 
 	onMount(async () => {
 		const { BundleLoader } = await import('$lib/patchcdn/cache');
@@ -114,18 +127,31 @@
 </script>
 
 <section class=" overflow-y-scroll w-1/4">
-	<h3>Directory Contents</h3>
+	<input
+		class="input"
+		bind:value={searchTerm}
+		title="Input (search)"
+		type="search"
+		placeholder="Filter files..."
+	/>
+	<hr class="mb-2" />
 	{#if currentPath}
-		<button type="button" class="btn variant-outline-primary w-full" on:click={goUp}>Go Up</button>
+		<button type="button" class="btn variant-outline-primary w-full my-2" on:click={goUp}
+			>Go Up</button
+		>
 	{/if}
 	<ul>
 		{#each dirContents.dirs as dir}
 			<!-- <li on:click={() => loadDirContents(dir)}><strong>{dir}</strong></li> -->
-       <li>
-         <button type="button" class="btn variant-ghost-primary w-full truncate" on:click={() => loadDirContents(dir)}>
-           {dir}
-          </button>
-        </li>
+			<li>
+				<button
+					type="button"
+					class="btn variant-ghost-primary w-full truncate"
+					on:click={() => loadDirContents(dir)}
+				>
+					{dir}
+				</button>
+			</li>
 		{/each}
 	</ul>
 
@@ -133,17 +159,21 @@
 		<div style="gap: 1rem;">
 			<!-- Directory Contents and Files -->
 			<div style="flex: 3;">
-				<h4>Files</h4>
+				<hr class="mb-2" />
 				<ul>
-					{#each dirContents.files as file}
+					{#each filteredFiles as file}
 						<!-- <li on:click={() => loadFileContent(`${file}`)}>{file}</li> -->
-            <li>
-              <button type="button" class="btn variant-ghost-primary w-full" on:click={() => loadFileContent(`${file}`)}>
-                <p class="truncate">
-                  {file.split('/').pop()}
-                </p>
-              </button>
-            </li>
+						<li>
+							<button
+								type="button"
+								class="btn variant-ghost-primary w-full"
+								on:click={() => loadFileContent(`${file}`)}
+							>
+								<p class="truncate">
+									{file.split('/').pop()}
+								</p>
+							</button>
+						</li>
 					{/each}
 				</ul>
 			</div>
@@ -154,16 +184,14 @@
 <section class=" w-3/4 max-h-screen overflow-scroll">
 	<!-- Display the data rows -->
 	{#if rows.length > 0}
-		<h3>Data Rows</h3>
-
 		<div class="table-auto">
 			<table class="table table-hover">
 				<thead>
 					<tr>
 						<th>#</th>
 						<!-- Index column -->
-						{#each headers as header}
-							<th class="text-center">
+						{#each headers as header, index}
+							<th class="text-center" on:click={() => toggleColumn(index)}>
 								<p>{header.name}</p>
 								<p>Length: {header.length}</p>
 							</th>
@@ -175,15 +203,17 @@
 					{#each rows as row, i}
 						<tr>
 							<td>{i + 1}</td>
-							{#each headers as header}
+							{#each headers as header, j}
 								<!-- TODO: Keep an eye of the comparison with falsy values, it might replace data. -->
-								<td
+								<!-- <td
 									>{header.name
 										? row[header.name] === ''
 											? 'empty'
 											: row[header.name]
 										: 'Unnamed'}</td
-								>
+								> -->
+
+                <TableCell value={row[header.name]} bytes={row[header.name]} showBytes={showBytesByColumn[j]} />
 							{/each}
 						</tr>
 					{/each}
