@@ -15,6 +15,8 @@ export class BundleLoader {
     active: null as Promise<unknown> | null
   });
 
+
+
   // For tracking memory usage and garbage collection
   private readonly registry = new FinalizationRegistry<string>((name) => {
     console.debug(`[Bundle] garbage-collected, name: "${name}"`);
@@ -100,8 +102,10 @@ export class BundleLoader {
       }));
 
       // Network fetch request
-      // res = await fetch(`https://poe-bundles.snos.workers.dev/${path}`);
-      res = await fetch('/_.index.bin')
+      // TODO: Use the actual patchcdn URL - set up a proxy and handle CORS
+      // res = await fetch(`https://patch.poecdn.com/${path}`);
+      res = await fetch(`https://poe-bundles.snos.workers.dev/${path}`);
+      // res = await fetch('/_.index.bin')
       if (res.status !== 200) {
         this.state.update((state) => ({ ...state, isDownloading: false }));
         throw new Error(`patchcdn: ${res.status} ${res.statusText}`);

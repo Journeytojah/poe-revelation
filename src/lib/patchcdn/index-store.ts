@@ -53,7 +53,15 @@ export class BundleIndex {
 
   // Get directory content for a given path
   getDirContent(dirPath: string) {
-    const { pathReps, dirsInfo } = get(this.index)!;
+    const indexState = get(this.index);
+
+    if (!indexState) {
+      console.error(`Index not loaded yet, cannot retrieve directory content for path: ${dirPath}`);
+      return null; // Return null or some fallback structure
+    }
+
+    const { pathReps, dirsInfo } = indexState;
+
     return perf.fn(`[Index] getting "${dirPath}" dir`, () =>
       getDirContent(dirPath, pathReps, dirsInfo)
     );
