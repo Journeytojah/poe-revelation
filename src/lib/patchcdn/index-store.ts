@@ -27,6 +27,9 @@ export class BundleIndex {
     const _index = readIndexBundle(indexBundle);
     const { slice: pathReps } = await decompressBundle(_index.pathRepsBundle.slice().buffer);
 
+    console.log('Index loaded:', _index);  // Inspect the index structure here
+    console.log('Files Info:', _index.filesInfo);  // Ensure the filesInfo is populated correctly
+
     this.index.set({
       bundlesInfo: _index.bundlesInfo,
       filesInfo: _index.filesInfo,
@@ -35,7 +38,6 @@ export class BundleIndex {
     });
   }
 
-  // Load file content based on its full path
   async loadFileContent(fullPath: string) {
     const index = get(this.index);
     if (!index) {
@@ -43,14 +45,37 @@ export class BundleIndex {
     }
 
     const { bundlesInfo, filesInfo } = index;
-    const location = getFileInfo(fullPath, bundlesInfo, filesInfo);
-    if (!location) {
-      throw new Error(`File not found for path: ${fullPath}`);
-    }
 
-    const bundleBin = await this.loader.fetchFile(location.bundle);
-    const { slice } = await decompressFileInBundle(bundleBin.slice(0), location.offset, location.size);
-    return slice;
+    console.log('Trying to load file:', fullPath);
+    console.log('Files info:', filesInfo);
+
+    // Log the hash that `getFileInfo` will search for
+    const murmur64a = (await import('$lib/utils/murmur2.js')).murmur64a;
+    const fileHash = murmur64a(fullPath.toLowerCase());
+    console.log('File hash:', fileHash);
+
+    try {
+      // log with color to easily identify the file location
+      console.log('%cGetting file location...', 'color: #2196F3');
+      console.log('Full path:', fullPath);
+      console.log('Bundles info:', bundlesInfo);
+      console.log('Files info:', filesInfo);
+      
+      
+      const location = getFileInfo(fullPath, bundlesInfo, filesInfo);
+      console.log('File location:', location);
+
+      if (!location) {
+        throw new Error(`File not found for path: ${fullPath}`);
+      }
+
+      const bundleBin = await this.loader.fetchFile(location.bundle);
+      const { slice } = await decompressFileInBundle(bundleBin.slice(0), location.offset, location.size);
+      return slice;
+    } catch (error) {
+      console.error(`Failed to load file: ${fullPath}`, error);
+      throw error;
+    }
   }
 
   // Get directory content for a given path
