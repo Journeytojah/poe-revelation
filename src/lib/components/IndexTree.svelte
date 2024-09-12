@@ -91,7 +91,7 @@
 			console.log('Extracted rows:', rows);
 
 			const endTime = performance.now();
-			console.log(`Extracting rows took ${endTime - startTime} milliseconds`);
+			console.log(`Loading content and extracting rows took ${endTime - startTime} milliseconds`);
 		} else {
 			console.warn(`Invalid headers for file: ${schemaName}`);
 		}
@@ -101,18 +101,22 @@
 	async function extractRows(datFile: DatFile, headers: Header[]) {
 		// Dynamically import necessary functions
 		const { readColumn } = await import('pathofexile-dat/dat.js');
+		const columns = await Promise.all(headers.map((header) => readColumn(header, datFile)));
 
+		const startTime = performance.now();
 		const rows = [];
 		for (let i = 0; i < datFile.rowCount; i++) {
 			const row: { [key: string]: any } = {};
-			for (const header of headers) {
-				const value = await readColumn(header, datFile)[i];
+			for (const [index, header] of headers.entries()) {
+				const value = columns[index][i];
 				if (header.name) {
 					row[header.name] = value;
 				}
 			}
 			rows.push(row);
 		}
+		const endTime = performance.now();
+		console.log(`Extracting rows took ${endTime - startTime} milliseconds`);
 		return rows;
 	}
 
@@ -213,7 +217,11 @@
 										: 'Unnamed'}</td
 								> -->
 
-                <TableCell value={row[header.name]} bytes={row[header.name]} showBytes={showBytesByColumn[j]} />
+								<TableCell
+									value={row[header.name]}
+									bytes={row[header.name]}
+									showBytes={showBytesByColumn[j]}
+								/>
 							{/each}
 						</tr>
 					{/each}
