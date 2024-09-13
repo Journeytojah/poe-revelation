@@ -93,7 +93,8 @@ export class DatSchemasDatabase {
   }
 
   async preloadDataTables(totalTables: { set: (value: number) => void }) {
-    const filePaths = this.index.getDirContent('data').files.filter((file) => file.endsWith('.dat64'));
+    const dirContent = this.index.getDirContent('data');
+    const filePaths = dirContent ? dirContent.files.filter((file) => file.endsWith('.dat64')) : [];
 
     totalTables.set(filePaths.length);
 

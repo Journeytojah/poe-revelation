@@ -4,6 +4,8 @@
 	import type { DatFile } from 'pathofexile-dat/dat.js';
 	import { onMount } from 'svelte';
 	import TableCell from './TableCell.svelte';
+  import { List } from "svelte-virtual";
+
 
 	let loader;
 	let index: BundleIndex;
@@ -13,9 +15,13 @@
 	let fileContent: Uint8Array | null = null;
 	let headers: Header[] = []; // Store headers here
 	let currentPath: string = '';
+	let datFile: DatFile | null = null;
 	let rows: any[] = []; // To store rows from the .dat file
 	let searchTerm: string = '';
 	let loading: boolean = false;
+  let items = dirContents.files;
+
+  $: items = dirContents.files;
 
 	let showBytesByColumn: boolean[] = []; // Track column toggle states
 
@@ -53,6 +59,8 @@
 		currentPath = dirPath; // Update current path
 
 		const contents = index.getDirContent(dirPath) || { files: [], dirs: [] };
+    // filter out the files that are not .dat64
+    contents.files = contents.files.filter((file) => file.endsWith('.dat64'));
 		dirContents = { dirs: contents.dirs, files: contents.files };
 	}
 
@@ -65,12 +73,12 @@
 		const schemaName = filePath.replace('data/', '').replace('.dat64', '');
 
 		// Dynamically import necessary functions
-		const { readDatFile, readColumn } = await import('pathofexile-dat/dat.js');
+		const { readDatFile } = await import('pathofexile-dat/dat.js');
 		const { analyzeDatFile } = await import('$lib/worker/interface');
 		const { fromSerializedHeaders } = await import('$lib/dat-viewer/headers');
 
 		// Parse `.dat64` file
-		const datFile = readDatFile(filePath, fileContent);
+		datFile = readDatFile(filePath, fileContent);
 		const columnStats = await analyzeDatFile(datFile);
 
 		// Find and apply headers
@@ -83,17 +91,18 @@
 				...header,
 				name: header.name ? header.name : `Unnamed ${index}`
 			}));
-			console.log('Loaded file headers:', headers);
+			// console.log('Loaded file headers:', headers);
 
 			// Time the operation of extracting rows
-			const startTime = performance.now();
+			// const startTime = performance.now();
 
 			// Extract rows from the datFile using the headers
 			rows = await extractRows(datFile, headers);
-			console.log('Extracted rows:', rows);
+			// console.log('Extracted rows:', rows);
 
-			const endTime = performance.now();
-			console.log(`Extracting rows took ${endTime - startTime} milliseconds`);
+			// const endTime = performance.now();
+			// console.log(`Extracting rows took ${endTime - startTime} milliseconds`);
+
 			loading = false;
 		} else {
 			console.warn(`Invalid headers for file: ${schemaName}`);
@@ -143,7 +152,7 @@
 			>Go Up</button
 		>
 	{/if}
-	<ul>
+	<ul style="height:40vh">
 		{#each dirContents.dirs as dir}
 			<!-- <li on:click={() => loadDirContents(dir)}><strong>{dir}</strong></li> -->
 			<li>
@@ -163,9 +172,8 @@
 			<!-- Directory Contents and Files -->
 			<div style="flex: 3;">
 				<hr class="mb-2" />
-				<ul>
+				<!-- <ul>
 					{#each filteredFiles as file}
-						<!-- <li on:click={() => loadFileContent(`${file}`)}>{file}</li> -->
 						<li>
 							<button
 								type="button"
@@ -178,7 +186,18 @@
 							</button>
 						</li>
 					{/each}
-				</ul>
+				</ul> -->
+
+        <List 
+          itemCount={items.length}
+          itemSize={20}
+          height={"50vh"}
+          scrollBehavior="smooth"
+          >
+          <div slot="item" let:index let:style {style} on:click={() => loadFileContent(`${items[index]}`)}>
+            {items[index]}
+          </div>
+        </List>
 			</div>
 		</div>
 	</div>
@@ -223,8 +242,8 @@
 								> -->
 
 								<TableCell
-									value={row[header.name]}
-									bytes={row[header.name]}
+									value={header.name ? row[header.name] : 'Unnamed'}
+									bytes={header.name ? row[header.name] : 'Unnamed'}
 									showBytes={showBytesByColumn[j]}
 								/>
 							{/each}
@@ -236,7 +255,7 @@
 	{:else}
 		<!-- make the image spin while loading -->
 		<img
-			src="static/newkekclose.png"
+			src="/newkekclose.png"
 			alt="Loading..."
 			class="mx-auto rounded-full object-cover animate-spin h-24 w-24"
 		/>

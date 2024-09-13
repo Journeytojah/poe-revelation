@@ -27,7 +27,7 @@ export class BundleIndex {
     const _index = readIndexBundle(indexBundle);
     const { slice: pathReps } = await decompressBundle(_index.pathRepsBundle.slice().buffer);
 
-    console.log('Index loaded:', _index);  // Log the entire index structure
+    // console.log('Index loaded:', _index);  // Log the entire index structure
 
     this.index.set({
       bundlesInfo: _index.bundlesInfo,
@@ -37,7 +37,7 @@ export class BundleIndex {
     });
 
     // Log filesInfo to check if .dat64 files are indexed
-    console.log('Files Info:', _index.filesInfo);
+    // console.log('Files Info:', _index.filesInfo);
   }
 
   // Load file content based on filePath
@@ -49,7 +49,7 @@ export class BundleIndex {
 
     const { slice } = await decompressFileInBundle(bundleBin.slice(0), location.offset, location.size)
 
-    console.log('File content:', slice); // Log the file content
+    // console.log('File content:', slice); // Log the file content
     
     return slice
   }
