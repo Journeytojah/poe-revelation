@@ -15,6 +15,7 @@
 	let currentPath: string = '';
 	let rows: any[] = []; // To store rows from the .dat file
 	let searchTerm: string = '';
+	let loading: boolean = false;
 
 	let showBytesByColumn: boolean[] = []; // Track column toggle states
 
@@ -57,6 +58,7 @@
 
 	// Load file content
 	async function loadFileContent(filePath: string) {
+		loading = true;
 		fileContent = await index.loadFileContent(filePath); // Load file content
 
 		// Extract schema name
@@ -92,6 +94,7 @@
 
 			const endTime = performance.now();
 			console.log(`Extracting rows took ${endTime - startTime} milliseconds`);
+			loading = false;
 		} else {
 			console.warn(`Invalid headers for file: ${schemaName}`);
 		}
@@ -183,7 +186,13 @@
 
 <section class=" w-3/4 max-h-screen overflow-scroll">
 	<!-- Display the data rows -->
-	{#if rows.length > 0}
+	<!-- 
+      We needed to fix the table being painted in the DOM twice.
+      And we did fix it. 
+      
+      "Just dont paint the table twice 4head" - OneRobotBoii 2024
+  -->
+	{#if !loading}
 		<div class="table-auto">
 			<table class="table table-hover">
 				<thead>
@@ -213,12 +222,24 @@
 										: 'Unnamed'}</td
 								> -->
 
-                <TableCell value={row[header.name]} bytes={row[header.name]} showBytes={showBytesByColumn[j]} />
+								<TableCell
+									value={row[header.name]}
+									bytes={row[header.name]}
+									showBytes={showBytesByColumn[j]}
+								/>
 							{/each}
 						</tr>
 					{/each}
 				</tbody>
 			</table>
 		</div>
+	{:else}
+		<!-- make the image spin while loading -->
+		<img
+			src="static/newkekclose.png"
+			alt="Loading..."
+			class="mx-auto rounded-full object-cover animate-spin h-24 w-24"
+		/>
+		<h1 class="text-center">Loading...</h1>
 	{/if}
 </section>

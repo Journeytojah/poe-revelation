@@ -1,4 +1,5 @@
 <script lang="ts">
+  // "When I started this project, only God and I understood the code. Now only God knows." - OneRobotBoii 2024
 	import '../app.postcss';
 
 	// Highlight JS
