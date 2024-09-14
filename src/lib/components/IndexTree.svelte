@@ -4,7 +4,7 @@
 	import type { DatFile } from 'pathofexile-dat/dat.js';
 	import { onMount } from 'svelte';
 	import TableCell from './TableCell.svelte';
-  import { List } from "svelte-virtual";
+  import { Grid, List } from "svelte-virtual";
 
 
 	let loader;
@@ -19,9 +19,6 @@
 	let rows: any[] = []; // To store rows from the .dat file
 	let searchTerm: string = '';
 	let loading: boolean = false;
-  let items = dirContents.files;
-
-  $: items = dirContents.files;
 
 	let showBytesByColumn: boolean[] = []; // Track column toggle states
 
@@ -152,7 +149,7 @@
 			>Go Up</button
 		>
 	{/if}
-	<ul style="height:40vh">
+	<ul >
 		{#each dirContents.dirs as dir}
 			<!-- <li on:click={() => loadDirContents(dir)}><strong>{dir}</strong></li> -->
 			<li>
@@ -188,22 +185,34 @@
 					{/each}
 				</ul> -->
 
-        <List 
-          itemCount={items.length}
-          itemSize={20}
-          height={"50vh"}
-          scrollBehavior="smooth"
-          >
-          <div slot="item" let:index let:style {style} on:click={() => loadFileContent(`${items[index]}`)}>
-            {items[index]}
-          </div>
-        </List>
+       <!-- Adjust the outer container to hold the virtual list properly -->
+	<div class="file-list-container" style="position: relative; max-height: 400px; overflow: auto;">
+		<List
+			itemCount={filteredFiles.length}
+			itemSize={40}
+			height={"400px"}
+			scrollBehavior="smooth"
+			overScan={10}
+		>
+			<div slot="item" let:index let:style {style} class="list-item">
+				<button
+					type="button"
+					class="btn variant-ghost-primary w-full"
+					on:click={() => loadFileContent(`${filteredFiles[index]}`)}
+				>
+					<p class="truncate">
+						{filteredFiles[index].split('/').pop()}
+					</p>
+				</button>
+			</div>
+		</List>
+	</div>
 			</div>
 		</div>
 	</div>
 </section>
 
-<section class=" w-3/4 max-h-screen overflow-scroll">
+<section class=" w-3/4 max-h-screen">
 	<!-- Display the data rows -->
 	<!-- 
       We needed to fix the table being painted in the DOM twice.
@@ -211,49 +220,34 @@
       
       "Just dont paint the table twice 4head" - OneRobotBoii 2024
   -->
+	<!-- Virtualized Grid replacing the table -->
 	{#if !loading}
-		<div class="table-auto">
-			<table class="table table-hover">
-				<thead>
-					<tr>
-						<th>#</th>
-						<!-- Index column -->
-						{#each headers as header, index}
-							<th class="text-center" on:click={() => toggleColumn(index)}>
-								<p>{header.name}</p>
-								<p>Length: {header.length}</p>
-							</th>
-							<!-- Use the header name, including Unnamed X -->
-						{/each}
-					</tr>
-				</thead>
-				<tbody>
-					{#each rows as row, i}
-						<tr>
-							<td>{i + 1}</td>
-							{#each headers as header, j}
-								<!-- TODO: Keep an eye of the comparison with falsy values, it might replace data. -->
-								<!-- <td
-									>{header.name
-										? row[header.name] === ''
-											? 'empty'
-											: row[header.name]
-										: 'Unnamed'}</td
-								> -->
-
-								<TableCell
-									value={header.name ? row[header.name] : 'Unnamed'}
-									bytes={header.name ? row[header.name] : 'Unnamed'}
-									showBytes={showBytesByColumn[j]}
-								/>
-							{/each}
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
+		<Grid
+			itemCount={rows.length * (headers.length + 1)}
+			itemHeight={50}
+			itemWidth={150}
+			height={500} 
+			columnCount={headers.length + 1}
+      overScan={10}
+		>
+			<div slot="item" let:rowIndex let:columnIndex let:style {style}>
+				{#if columnIndex === 0}
+					<!-- Render the row index in the first column -->
+					<div class="p-2">
+            {rowIndex + 1}
+          </div>
+				{:else}
+					<!-- Render the data cells -->
+					<TableCell
+						value={headers[columnIndex - 1].name ? rows[rowIndex][headers[columnIndex - 1].name] : 'Unnamed'}
+						bytes={headers[columnIndex - 1].name ? rows[rowIndex][headers[columnIndex - 1].name] : 'Unnamed'}
+						showBytes={showBytesByColumn[columnIndex - 1]}
+					/>
+				{/if}
+			</div>
+		</Grid>
 	{:else}
-		<!-- make the image spin while loading -->
+		<!-- Loading spinner -->
 		<img
 			src="/newkekclose.png"
 			alt="Loading..."
