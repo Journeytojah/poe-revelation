@@ -4,8 +4,7 @@
 	import type { DatFile } from 'pathofexile-dat/dat.js';
 	import { onMount } from 'svelte';
 	import TableCell from './TableCell.svelte';
-  import { Grid, List } from "svelte-virtual";
-
+	import { Grid, List } from 'svelte-virtual';
 
 	let loader;
 	let index: BundleIndex;
@@ -56,8 +55,8 @@
 		currentPath = dirPath; // Update current path
 
 		const contents = index.getDirContent(dirPath) || { files: [], dirs: [] };
-    // filter out the files that are not .dat64
-    contents.files = contents.files.filter((file) => file.endsWith('.dat64'));
+		// filter out the files that are not .dat64
+		contents.files = contents.files.filter((file) => file.endsWith('.dat64'));
 		dirContents = { dirs: contents.dirs, files: contents.files };
 	}
 
@@ -94,7 +93,7 @@
 			// const startTime = performance.now();
 
 			// Extract rows from the datFile using the headers
-			rows = await extractRows(datFile, headers);
+			rows = (await extractRows(datFile, headers)) as { [key: string]: any }[];
 			// console.log('Extracted rows:', rows);
 
 			// const endTime = performance.now();
@@ -110,18 +109,22 @@
 	async function extractRows(datFile: DatFile, headers: Header[]) {
 		// Dynamically import necessary functions
 		const { readColumn } = await import('pathofexile-dat/dat.js');
+		const columns = await Promise.all(headers.map((header) => readColumn(header, datFile)));
 
-		const rows = [];
+		const startTime = performance.now();
+		const rows: { [key: string]: any }[] = [];
 		for (let i = 0; i < datFile.rowCount; i++) {
 			const row: { [key: string]: any } = {};
-			for (const header of headers) {
-				const value = await readColumn(header, datFile)[i];
+			for (const [index, header] of headers.entries()) {
+				const value = columns[index][i];
 				if (header.name) {
 					row[header.name] = value;
 				}
 			}
 			rows.push(row);
 		}
+		const endTime = performance.now();
+		console.log(`Extracting rows took ${endTime - startTime} milliseconds`);
 		return rows;
 	}
 
@@ -149,7 +152,7 @@
 			>Go Up</button
 		>
 	{/if}
-	<ul >
+	<ul>
 		{#each dirContents.dirs as dir}
 			<!-- <li on:click={() => loadDirContents(dir)}><strong>{dir}</strong></li> -->
 			<li>
@@ -185,28 +188,31 @@
 					{/each}
 				</ul> -->
 
-       <!-- Adjust the outer container to hold the virtual list properly -->
-	<div class="file-list-container" style="position: relative; max-height: 400px; overflow: auto;">
-		<List
-			itemCount={filteredFiles.length}
-			itemSize={40}
-			height={"400px"}
-			scrollBehavior="smooth"
-			overScan={10}
-		>
-			<div slot="item" let:index let:style {style} class="list-item">
-				<button
-					type="button"
-					class="btn variant-ghost-primary w-full"
-					on:click={() => loadFileContent(`${filteredFiles[index]}`)}
+				<!-- Adjust the outer container to hold the virtual list properly -->
+				<div
+					class="file-list-container"
+					style="position: relative; max-height: 400px; overflow: auto;"
 				>
-					<p class="truncate">
-						{filteredFiles[index].split('/').pop()}
-					</p>
-				</button>
-			</div>
-		</List>
-	</div>
+					<List
+						itemCount={filteredFiles.length}
+						itemSize={40}
+						height={'400px'}
+						scrollBehavior="smooth"
+						overScan={10}
+					>
+						<div slot="item" let:index let:style {style} class="list-item">
+							<button
+								type="button"
+								class="btn variant-ghost-primary w-full"
+								on:click={() => loadFileContent(`${filteredFiles[index]}`)}
+							>
+								<p class="truncate">
+									{filteredFiles[index].split('/').pop()}
+								</p>
+							</button>
+						</div>
+					</List>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -226,22 +232,22 @@
 			itemCount={rows.length * (headers.length + 1)}
 			itemHeight={50}
 			itemWidth={150}
-			height={500} 
+			height={500}
 			columnCount={headers.length + 1}
-      overScan={10}
+			overScan={10}
 		>
 			<div slot="item" let:rowIndex let:columnIndex let:style {style}>
 				{#if columnIndex === 0}
 					<!-- Render the row index in the first column -->
 					<div class="p-2">
-            {rowIndex + 1}
-          </div>
+						{rowIndex + 1}
+					</div>
 				{:else}
 					<!-- Render the data cells -->
 					<TableCell
-						value={headers[columnIndex - 1].name ? rows[rowIndex][headers[columnIndex - 1].name] : 'Unnamed'}
-						bytes={headers[columnIndex - 1].name ? rows[rowIndex][headers[columnIndex - 1].name] : 'Unnamed'}
-						showBytes={showBytesByColumn[columnIndex - 1]}
+						value={rows[rowIndex][headers[columnIndex - 1].name]}
+            showBytes={showBytesByColumn[columnIndex - 1]}
+            bytes={rows[rowIndex][headers[columnIndex - 1].name]}
 					/>
 				{/if}
 			</div>
