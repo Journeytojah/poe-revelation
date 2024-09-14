@@ -31,6 +31,7 @@
 	});
 
 	onMount(async () => {
+    loading = false;
 		const { BundleLoader } = await import('$lib/patchcdn/cache');
 		const { BundleIndex } = await import('$lib/patchcdn/index-store');
 		const { DatSchemasDatabase } = await import('$lib/dat-viewer/db');
@@ -138,7 +139,7 @@
 	}
 </script>
 
-<section class=" overflow-y-scroll w-1/4">
+<section class="w-1/4">
 	<input
 		class="input"
 		bind:value={searchTerm}
@@ -152,51 +153,37 @@
 			>Go Up</button
 		>
 	{/if}
-	<ul>
-		{#each dirContents.dirs as dir}
-			<!-- <li on:click={() => loadDirContents(dir)}><strong>{dir}</strong></li> -->
-			<li>
+	<div class="file-list-container" style="position: relative; max-height: 400px; overflow: auto;">
+		<List
+			itemCount={dirContents.dirs.length}
+			itemSize={40}
+			height={'30vh'}
+			scrollBehavior="smooth"
+			overScan={10}
+		>
+			<div slot="item" let:index let:style {style} class="list-item">
 				<button
 					type="button"
 					class="btn variant-ghost-primary w-full truncate"
-					on:click={() => loadDirContents(dir)}
+					on:click={() => loadDirContents(dirContents.dirs[index])}
 				>
-					{dir}
+					{dirContents.dirs[index]}
 				</button>
-			</li>
-		{/each}
-	</ul>
+			</div>
+		</List>
+	</div>
 
 	<div class=" flex-col">
 		<div style="gap: 1rem;">
 			<!-- Directory Contents and Files -->
 			<div style="flex: 3;">
 				<hr class="mb-2" />
-				<!-- <ul>
-					{#each filteredFiles as file}
-						<li>
-							<button
-								type="button"
-								class="btn variant-ghost-primary w-full"
-								on:click={() => loadFileContent(`${file}`)}
-							>
-								<p class="truncate">
-									{file.split('/').pop()}
-								</p>
-							</button>
-						</li>
-					{/each}
-				</ul> -->
-
 				<!-- Adjust the outer container to hold the virtual list properly -->
-				<div
-					class="file-list-container"
-					style="position: relative; max-height: 400px; overflow: auto;"
-				>
+				<div class="file-list-container" style="position: relative; overflow: auto;">
 					<List
 						itemCount={filteredFiles.length}
 						itemSize={40}
-						height={'400px'}
+						height={'59vh'}
 						scrollBehavior="smooth"
 						overScan={10}
 					>
@@ -231,23 +218,33 @@
 		<Grid
 			itemCount={rows.length * (headers.length + 1)}
 			itemHeight={50}
-			itemWidth={150}
-			height={500}
+			itemWidth={250}
+			height={window.innerHeight}
 			columnCount={headers.length + 1}
 			overScan={10}
 		>
-			<div slot="item" let:rowIndex let:columnIndex let:style {style}>
+			<div slot="header" class="grid grid-flow-col">
+        <div class="p-2" style=" height: 50px; width: 250px;">#</div>
+				{#each headers as header, index}
+					<div class="p-2" style=" height: 50px; width: 250px;">
+            <button type="button" on:click={() => toggleColumn(index)} class="btn variant-ghost-tertiary">
+              {header.name}
+            </button>
+					</div>
+				{/each}
+			</div>
+			<div slot="item" let:rowIndex let:columnIndex let:style {style} class="overflow-hidden text-ellipsis">
 				{#if columnIndex === 0}
 					<!-- Render the row index in the first column -->
-					<div class="p-2">
+					<div class="p-2" style=" height: 50px; width: 250px;">
 						{rowIndex + 1}
 					</div>
 				{:else}
 					<!-- Render the data cells -->
 					<TableCell
 						value={rows[rowIndex][headers[columnIndex - 1].name]}
-            showBytes={showBytesByColumn[columnIndex - 1]}
-            bytes={rows[rowIndex][headers[columnIndex - 1].name]}
+						showBytes={showBytesByColumn[columnIndex - 1]}
+						bytes={rows[rowIndex][headers[columnIndex - 1].name]}
 					/>
 				{/if}
 			</div>
