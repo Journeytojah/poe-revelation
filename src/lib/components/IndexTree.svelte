@@ -12,14 +12,21 @@
 	let dirs: string[] = [];
 	let dirContents: { files: string[]; dirs: string[] } = { files: [], dirs: [] };
 	let fileContent: Uint8Array | null = null;
-	let headers: Header[] = []; // Store headers here
+	let headers: Header[] = [];
 	let currentPath: string = '';
 	let datFile: DatFile | null = null;
-	let rows: any[] = []; // To store rows from the .dat file
+	let rows: { [key: string]: any }[] = [];
 	let searchTerm: string = '';
 	let loading: boolean = false;
 
+	let windowHeight: number = 0;
+
 	let showBytesByColumn: boolean[] = []; // Track column toggle states
+
+	// calculate window height and return a number in pixels
+	$: if (typeof window !== 'undefined') {
+		windowHeight = window.innerHeight;
+	}
 
 	function toggleColumn(index: number) {
 		showBytesByColumn[index] = !showBytesByColumn[index];
@@ -31,7 +38,7 @@
 	});
 
 	onMount(async () => {
-    loading = false;
+		loading = false;
 		const { BundleLoader } = await import('$lib/patchcdn/cache');
 		const { BundleIndex } = await import('$lib/patchcdn/index-store');
 		const { DatSchemasDatabase } = await import('$lib/dat-viewer/db');
@@ -159,7 +166,7 @@
 			itemSize={40}
 			height={'30vh'}
 			scrollBehavior="smooth"
-			overScan={10}
+			overScan={1}
 		>
 			<div slot="item" let:index let:style {style} class="list-item">
 				<button
@@ -185,7 +192,7 @@
 						itemSize={40}
 						height={'59vh'}
 						scrollBehavior="smooth"
-						overScan={10}
+						overScan={1}
 					>
 						<div slot="item" let:index let:style {style} class="list-item">
 							<button
@@ -216,35 +223,53 @@
 	<!-- Virtualized Grid replacing the table -->
 	{#if !loading}
 		<Grid
+			height={windowHeight}
 			itemCount={rows.length * (headers.length + 1)}
 			itemHeight={50}
 			itemWidth={250}
-			height={window.innerHeight}
 			columnCount={headers.length + 1}
 			overScan={10}
 		>
-			<div slot="header" class="grid grid-flow-col">
-        <div class="p-2" style=" height: 50px; width: 250px;">#</div>
+			<!-- TODO: fix header widths -->
+			<div slot="header" class="grid grid-flow-col text-center">
+				{#if headers.length > 0}
+					<div class="p-2" style=" height: 50px; width: 250px;">#</div>
+				{/if}
 				{#each headers as header, index}
-					<div class="p-2" style=" height: 50px; width: 250px;">
-            <button type="button" on:click={() => toggleColumn(index)} class="btn variant-ghost-tertiary">
-              {header.name}
-            </button>
+					<!-- svelte-ignore a11y-no-static-element-interactions -->
+					<!-- svelte-ignore a11y-click-events-have-key-events -->
+					<div
+						class="p-2"
+						style=" height: 50px; width: 250px;"
+						on:click={() => toggleColumn(index)}
+					>
+						<TableCell
+							value={header.name}
+							showBytes={showBytesByColumn[index]}
+							bytes={header.name}
+						/>
 					</div>
 				{/each}
 			</div>
-			<div slot="item" let:rowIndex let:columnIndex let:style {style} class="overflow-hidden text-ellipsis">
+			<div
+				slot="item"
+				let:rowIndex
+				let:columnIndex
+				let:style
+				{style}
+				class="overflow-hidden text-ellipsis my-12"
+			>
 				{#if columnIndex === 0}
 					<!-- Render the row index in the first column -->
-					<div class="p-2" style=" height: 50px; width: 250px;">
+					<div class="p-2 text-center" style=" height: 50px; width: 250px;">
 						{rowIndex + 1}
 					</div>
 				{:else}
 					<!-- Render the data cells -->
 					<TableCell
-						value={rows[rowIndex][headers[columnIndex - 1].name]}
+						value={rows[rowIndex][headers[columnIndex - 1]?.name ?? '']}
 						showBytes={showBytesByColumn[columnIndex - 1]}
-						bytes={rows[rowIndex][headers[columnIndex - 1].name]}
+						bytes={rows[rowIndex][headers[columnIndex - 1]?.name ?? '']}
 					/>
 				{/if}
 			</div>
@@ -259,3 +284,6 @@
 		<h1 class="text-center">Loading...</h1>
 	{/if}
 </section>
+
+<style>
+</style>

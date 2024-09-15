@@ -7,7 +7,7 @@
 {#if showBytes}
 	<span> DEEZ BYTES </span>
 {:else}
-	<span class="text-center truncate">
+	<span class="text-center truncate block">
 		{value}
 	</span>
 {/if}
