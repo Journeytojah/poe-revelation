@@ -5,6 +5,7 @@
 	import { onMount } from 'svelte';
 	import TableCell from './TableCell.svelte';
 	import { Grid, List } from 'svelte-virtual';
+	import DataTable from './Table/DataTable.svelte';
 
 	let loader;
 	let index: BundleIndex;
@@ -222,7 +223,7 @@
   -->
 	<!-- Virtualized Grid replacing the table -->
 	{#if !loading}
-		<Grid
+		<!-- <Grid
 			height={windowHeight}
 			itemCount={rows.length * (headers.length + 1)}
 			itemHeight={50}
@@ -230,14 +231,12 @@
 			columnCount={headers.length + 1}
 			overScan={10}
 		>
-			<!-- TODO: fix header widths -->
 			<div slot="header" class="grid grid-flow-col text-center">
 				{#if headers.length > 0}
 					<div class="p-2" style=" height: 50px; width: 250px;">#</div>
 				{/if}
 				{#each headers as header, index}
-					<!-- svelte-ignore a11y-no-static-element-interactions -->
-					<!-- svelte-ignore a11y-click-events-have-key-events -->
+
 					<div
 						class="p-2"
 						style=" height: 50px; width: 250px;"
@@ -260,12 +259,10 @@
 				class="overflow-hidden text-ellipsis my-12"
 			>
 				{#if columnIndex === 0}
-					<!-- Render the row index in the first column -->
 					<div class="p-2 text-center" style=" height: 50px; width: 250px;">
 						{rowIndex + 1}
 					</div>
 				{:else}
-					<!-- Render the data cells -->
 					<TableCell
 						value={rows[rowIndex][headers[columnIndex - 1]?.name ?? '']}
 						showBytes={showBytesByColumn[columnIndex - 1]}
@@ -273,7 +270,9 @@
 					/>
 				{/if}
 			</div>
-		</Grid>
+		</Grid> -->
+
+   		<DataTable {rows} {headers} />
 	{:else}
 		<!-- Loading spinner -->
 		<img

@@ -11,6 +11,9 @@ importers:
       '@floating-ui/dom':
         specifier: 1.6.10
         version: 1.6.10
+      '@vincjo/datatables':
+        specifier: ^1.14.10
+        version: 1.14.10(svelte@4.2.19)
       comlink:
         specifier: ^4.4.1
         version: 4.4.1
@@ -553,6 +556,11 @@ packages:
   '@typescript-eslint/visitor-keys@8.4.0':
     resolution: {integrity: sha512-zTQD6WLNTre1hj5wp09nBIDiOc2U5r/qmzo7wxPn4ZgAjHql09EofqhF9WF+fZHzL5aCyaIpPcT2hyxl73kr9A==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@vincjo/datatables@1.14.10':
+    resolution: {integrity: sha512-gtojSC/LKDHbh2ZGZeaAQ+lLltcmcSDDLkecgb9WpG7lHmd4b/1HUTtFWAJt43TnaK8SrciGugh9VRRZN53bpw==}
+    peerDependencies:
+      svelte: ^3.56.0 || ^4.0.0 || ^5.0.0-next.120
 
   '@vitest/expect@2.0.5':
     resolution: {integrity: sha512-yHZtwuP7JZivj65Gxoi8upUN2OzHTi3zVfjwdpu2WrvCZPLwsJ2Ey5ILIPccoW23dd/zQBlJ4/dhi7DWNyXCpA==}
@@ -2123,6 +2131,10 @@ snapshots:
     dependencies:
       '@typescript-eslint/types': 8.4.0
       eslint-visitor-keys: 3.4.3
+
+  '@vincjo/datatables@1.14.10(svelte@4.2.19)':
+    dependencies:
+      svelte: 4.2.19
 
   '@vitest/expect@2.0.5':
     dependencies:

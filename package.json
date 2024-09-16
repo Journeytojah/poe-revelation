@@ -46,6 +46,7 @@
   "type": "module",
   "dependencies": {
     "@floating-ui/dom": "1.6.10",
+    "@vincjo/datatables": "^1.14.10",
     "comlink": "^4.4.1",
     "expiry-map": "^2.0.0",
     "highlight.js": "11.10.0",
