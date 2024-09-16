@@ -4,6 +4,8 @@
 	import type { DatFile } from 'pathofexile-dat/dat.js';
 	import { onMount } from 'svelte';
 	import TableCell from './TableCell.svelte';
+	import { Grid, List } from 'svelte-virtual';
+	import DataTable from './Table/DataTable.svelte';
 
 	let loader;
 	let index: BundleIndex;
@@ -11,13 +13,21 @@
 	let dirs: string[] = [];
 	let dirContents: { files: string[]; dirs: string[] } = { files: [], dirs: [] };
 	let fileContent: Uint8Array | null = null;
-	let headers: Header[] = []; // Store headers here
+	let headers: Header[] = [];
 	let currentPath: string = '';
-	let rows: any[] = []; // To store rows from the .dat file
+	let datFile: DatFile | null = null;
+	let rows: { [key: string]: any }[] = [];
 	let searchTerm: string = '';
 	let loading: boolean = false;
 
+	let windowHeight: number = 0;
+
 	let showBytesByColumn: boolean[] = []; // Track column toggle states
+
+	// calculate window height and return a number in pixels
+	$: if (typeof window !== 'undefined') {
+		windowHeight = window.innerHeight;
+	}
 
 	function toggleColumn(index: number) {
 		showBytesByColumn[index] = !showBytesByColumn[index];
@@ -29,6 +39,7 @@
 	});
 
 	onMount(async () => {
+		loading = false;
 		const { BundleLoader } = await import('$lib/patchcdn/cache');
 		const { BundleIndex } = await import('$lib/patchcdn/index-store');
 		const { DatSchemasDatabase } = await import('$lib/dat-viewer/db');
@@ -53,6 +64,8 @@
 		currentPath = dirPath; // Update current path
 
 		const contents = index.getDirContent(dirPath) || { files: [], dirs: [] };
+		// filter out the files that are not .dat64
+		contents.files = contents.files.filter((file) => file.endsWith('.dat64'));
 		dirContents = { dirs: contents.dirs, files: contents.files };
 	}
 
@@ -65,12 +78,12 @@
 		const schemaName = filePath.replace('data/', '').replace('.dat64', '');
 
 		// Dynamically import necessary functions
-		const { readDatFile, readColumn } = await import('pathofexile-dat/dat.js');
+		const { readDatFile } = await import('pathofexile-dat/dat.js');
 		const { analyzeDatFile } = await import('$lib/worker/interface');
 		const { fromSerializedHeaders } = await import('$lib/dat-viewer/headers');
 
 		// Parse `.dat64` file
-		const datFile = readDatFile(filePath, fileContent);
+		datFile = readDatFile(filePath, fileContent);
 		const columnStats = await analyzeDatFile(datFile);
 
 		// Find and apply headers
@@ -83,17 +96,18 @@
 				...header,
 				name: header.name ? header.name : `Unnamed ${index}`
 			}));
-			console.log('Loaded file headers:', headers);
+			// console.log('Loaded file headers:', headers);
 
 			// Time the operation of extracting rows
-			const startTime = performance.now();
+			// const startTime = performance.now();
 
 			// Extract rows from the datFile using the headers
-			rows = await extractRows(datFile, headers);
-			console.log('Extracted rows:', rows);
+			rows = (await extractRows(datFile, headers)) as { [key: string]: any }[];
+			// console.log('Extracted rows:', rows);
 
-			const endTime = performance.now();
-			console.log(`Extracting rows took ${endTime - startTime} milliseconds`);
+			// const endTime = performance.now();
+			// console.log(`Extracting rows took ${endTime - startTime} milliseconds`);
+
 			loading = false;
 		} else {
 			console.warn(`Invalid headers for file: ${schemaName}`);
@@ -104,18 +118,22 @@
 	async function extractRows(datFile: DatFile, headers: Header[]) {
 		// Dynamically import necessary functions
 		const { readColumn } = await import('pathofexile-dat/dat.js');
+		const columns = await Promise.all(headers.map((header) => readColumn(header, datFile)));
 
-		const rows = [];
+		const startTime = performance.now();
+		const rows: { [key: string]: any }[] = [];
 		for (let i = 0; i < datFile.rowCount; i++) {
 			const row: { [key: string]: any } = {};
-			for (const header of headers) {
-				const value = await readColumn(header, datFile)[i];
+			for (const [index, header] of headers.entries()) {
+				const value = columns[index][i];
 				if (header.name) {
 					row[header.name] = value;
 				}
 			}
 			rows.push(row);
 		}
+		const endTime = performance.now();
+		console.log(`Extracting rows took ${endTime - startTime} milliseconds`);
 		return rows;
 	}
 
@@ -129,7 +147,7 @@
 	}
 </script>
 
-<section class=" overflow-y-scroll w-1/4">
+<section class="w-1/4">
 	<input
 		class="input"
 		bind:value={searchTerm}
@@ -143,48 +161,59 @@
 			>Go Up</button
 		>
 	{/if}
-	<ul>
-		{#each dirContents.dirs as dir}
-			<!-- <li on:click={() => loadDirContents(dir)}><strong>{dir}</strong></li> -->
-			<li>
+	<div class="file-list-container" style="position: relative; max-height: 400px; overflow: auto;">
+		<List
+			itemCount={dirContents.dirs.length}
+			itemSize={40}
+			height={'30vh'}
+			scrollBehavior="smooth"
+			overScan={1}
+		>
+			<div slot="item" let:index let:style {style} class="list-item">
 				<button
 					type="button"
 					class="btn variant-ghost-primary w-full truncate"
-					on:click={() => loadDirContents(dir)}
+					on:click={() => loadDirContents(dirContents.dirs[index])}
 				>
-					{dir}
+					{dirContents.dirs[index]}
 				</button>
-			</li>
-		{/each}
-	</ul>
+			</div>
+		</List>
+	</div>
 
 	<div class=" flex-col">
 		<div style="gap: 1rem;">
 			<!-- Directory Contents and Files -->
 			<div style="flex: 3;">
 				<hr class="mb-2" />
-				<ul>
-					{#each filteredFiles as file}
-						<!-- <li on:click={() => loadFileContent(`${file}`)}>{file}</li> -->
-						<li>
+				<!-- Adjust the outer container to hold the virtual list properly -->
+				<div class="file-list-container" style="position: relative; overflow: auto;">
+					<List
+						itemCount={filteredFiles.length}
+						itemSize={40}
+						height={'59vh'}
+						scrollBehavior="smooth"
+						overScan={1}
+					>
+						<div slot="item" let:index let:style {style} class="list-item">
 							<button
 								type="button"
 								class="btn variant-ghost-primary w-full"
-								on:click={() => loadFileContent(`${file}`)}
+								on:click={() => loadFileContent(`${filteredFiles[index]}`)}
 							>
 								<p class="truncate">
-									{file.split('/').pop()}
+									{filteredFiles[index].split('/').pop()}
 								</p>
 							</button>
-						</li>
-					{/each}
-				</ul>
+						</div>
+					</List>
+				</div>
 			</div>
 		</div>
 	</div>
 </section>
 
-<section class=" w-3/4 max-h-screen overflow-scroll">
+<section class=" w-3/4 max-h-screen">
 	<!-- Display the data rows -->
 	<!-- 
       We needed to fix the table being painted in the DOM twice.
@@ -192,54 +221,68 @@
       
       "Just dont paint the table twice 4head" - OneRobotBoii 2024
   -->
+	<!-- Virtualized Grid replacing the table -->
 	{#if !loading}
-		<div class="table-auto">
-			<table class="table table-hover">
-				<thead>
-					<tr>
-						<th>#</th>
-						<!-- Index column -->
-						{#each headers as header, index}
-							<th class="text-center" on:click={() => toggleColumn(index)}>
-								<p>{header.name}</p>
-								<p>Length: {header.length}</p>
-							</th>
-							<!-- Use the header name, including Unnamed X -->
-						{/each}
-					</tr>
-				</thead>
-				<tbody>
-					{#each rows as row, i}
-						<tr>
-							<td>{i + 1}</td>
-							{#each headers as header, j}
-								<!-- TODO: Keep an eye of the comparison with falsy values, it might replace data. -->
-								<!-- <td
-									>{header.name
-										? row[header.name] === ''
-											? 'empty'
-											: row[header.name]
-										: 'Unnamed'}</td
-								> -->
+		<!-- <Grid
+			height={windowHeight}
+			itemCount={rows.length * (headers.length + 1)}
+			itemHeight={50}
+			itemWidth={250}
+			columnCount={headers.length + 1}
+			overScan={10}
+		>
+			<div slot="header" class="grid grid-flow-col text-center">
+				{#if headers.length > 0}
+					<div class="p-2" style=" height: 50px; width: 250px;">#</div>
+				{/if}
+				{#each headers as header, index}
 
-								<TableCell
-									value={row[header.name]}
-									bytes={row[header.name]}
-									showBytes={showBytesByColumn[j]}
-								/>
-							{/each}
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
+					<div
+						class="p-2"
+						style=" height: 50px; width: 250px;"
+						on:click={() => toggleColumn(index)}
+					>
+						<TableCell
+							value={header.name}
+							showBytes={showBytesByColumn[index]}
+							bytes={header.name}
+						/>
+					</div>
+				{/each}
+			</div>
+			<div
+				slot="item"
+				let:rowIndex
+				let:columnIndex
+				let:style
+				{style}
+				class="overflow-hidden text-ellipsis my-12"
+			>
+				{#if columnIndex === 0}
+					<div class="p-2 text-center" style=" height: 50px; width: 250px;">
+						{rowIndex + 1}
+					</div>
+				{:else}
+					<TableCell
+						value={rows[rowIndex][headers[columnIndex - 1]?.name ?? '']}
+						showBytes={showBytesByColumn[columnIndex - 1]}
+						bytes={rows[rowIndex][headers[columnIndex - 1]?.name ?? '']}
+					/>
+				{/if}
+			</div>
+		</Grid> -->
+
+   		<DataTable {rows} {headers} />
 	{:else}
-		<!-- make the image spin while loading -->
+		<!-- Loading spinner -->
 		<img
-			src="static/newkekclose.png"
+			src="/newkekclose.png"
 			alt="Loading..."
 			class="mx-auto rounded-full object-cover animate-spin h-24 w-24"
 		/>
 		<h1 class="text-center">Loading...</h1>
 	{/if}
 </section>
+
+<style>
+</style>
